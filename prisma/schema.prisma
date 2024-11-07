@@ -1,0 +1,157 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  role          UserRole  @default(STUDENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  attempts      AssessmentAttempt[]
+  createdAssessments Assessment[]     @relation("CreatedBy")
+  questions     Question[]           @relation("CreatedBy")
+}
+
+enum UserRole {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+model Assessment {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  type        AssessmentType
+  duration    Int       // in minutes
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Metadata
+  category    String?
+  tags        Json      @default("[]")
+  difficulty  String?
+  
+  // Relations
+  createdBy   User      @relation("CreatedBy", fields: [creatorId], references: [id])
+  creatorId   String
+  questions   AssessmentQuestion[]
+  attempts    AssessmentAttempt[]
+  
+  // Settings
+  settings    Json      @default("{}")
+}
+
+enum AssessmentType {
+  REAL
+  PRACTICE
+}
+
+model Question {
+  id          String    @id @default(cuid())
+  title       String
+  type        QuestionType
+  content     Json      @default("{}")
+  points      Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Metadata
+  category    String?
+  tags        Json      @default("[]")
+  examType    ExamType  @default(REAL)
+  
+  // Relations
+  createdBy   User      @relation("CreatedBy", fields: [creatorId], references: [id])
+  creatorId   String
+  assessments AssessmentQuestion[]
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTIPLE_RESPONSE
+  TRUE_FALSE
+  ESSAY
+  DRAG_AND_DROP
+  LIKERT_SCALE
+  MATRIX
+}
+
+enum ExamType {
+  REAL
+  PRACTICE
+}
+
+model AssessmentQuestion {
+  id            String    @id @default(cuid())
+  assessment    Assessment @relation(fields: [assessmentId], references: [id])
+  assessmentId  String
+  question      Question   @relation(fields: [questionId], references: [id])
+  questionId    String
+  order         Int
+  required      Boolean   @default(true)
+  
+  @@unique([assessmentId, order])
+}
+
+model AssessmentAttempt {
+  id            String    @id @default(cuid())
+  assessment    Assessment @relation(fields: [assessmentId], references: [id])
+  assessmentId  String
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  status        AttemptStatus
+  answers       Json      @default("[]")
+  score         Float?
+  timeSpent     Int       // in seconds
+  
+  // Security & Monitoring
+  ipAddress     String?
+  browserInfo   String?   @db.Text
+  violations    Json?     @default("[]")
+  
+  @@index([userId, assessmentId])
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  TIMED_OUT
+}
+
+// Analytics Models
+model QuestionAnalytics {
+  id            String    @id @default(cuid())
+  questionId    String
+  totalAttempts Int      @default(0)
+  correctCount  Int      @default(0)
+  avgTimeSpent  Float    @default(0)
+  difficulty    Float    @default(0) // calculated based on success rate
+  
+  @@index([questionId])
+}
+
+model AssessmentAnalytics {
+  id              String    @id @default(cuid())
+  assessmentId    String
+  totalAttempts   Int      @default(0)
+  avgScore        Float    @default(0)
+  avgTimeSpent    Float    @default(0)
+  completionRate  Float    @default(0)
+  
+  @@index([assessmentId])
+}
