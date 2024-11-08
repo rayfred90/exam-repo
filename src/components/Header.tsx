@@ -1,6 +1,6 @@
 'use client';
 
-import { ThemeToggle } from './ThemeToggle';
+import ThemeToggle from './ThemeToggle';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -10,10 +10,41 @@ export function Header() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [viewingAsStudent, setViewingAsStudent] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    // Check auth status on mount
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/session');
+      if (!response.ok) {
+        router.push('/signin');
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      router.push('/signin');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const response = await fetch('/api/auth/signout', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sign out');
+      }
+
+      router.push('/signin');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+    }
+  };
 
   const isAdmin = mounted ? pathname?.includes('/admin/') : false;
 
@@ -110,15 +141,15 @@ export function Header() {
               </button>
             )}
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {viewingAsStudent ? 'Student View' : (isAdmin ? 'Admin' : 'Student')}
-              </span>
-              <div className="relative">
-                <Link 
-                  href={viewingAsStudent ? '/student/profile' : (isAdmin ? '/admin/profile' : '/student/profile')}
-                  className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
-                >
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 focus:outline-none"
+              >
+                <span className="text-sm text-muted-foreground">
+                  {viewingAsStudent ? 'Student View' : (isAdmin ? 'Admin' : 'Student')}
+                </span>
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
                   <svg
                     className="h-5 w-5 text-muted-foreground"
                     fill="none"
@@ -132,11 +163,37 @@ export function Header() {
                       d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                     />
                   </svg>
-                </Link>
+                </div>
                 {isAdmin && viewingAsStudent && (
                   <div className="absolute -top-1 -right-1 h-3 w-3 bg-yellow-400 rounded-full border-2 border-background" />
                 )}
-              </div>
+              </button>
+
+              {/* User Menu Dropdown */}
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                  <div className="py-1" role="menu">
+                    <Link
+                      href={viewingAsStudent ? '/student/profile' : (isAdmin ? '/admin/profile' : '/student/profile')}
+                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      role="menuitem"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        handleSignOut();
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      role="menuitem"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
